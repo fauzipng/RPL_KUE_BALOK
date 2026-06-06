@@ -1,44 +1,24 @@
 <?php
 session_start();
-require 'koneksi.php';
 
-// Validasi Keamanan: Jika pengunjung masuk ke sini tanpa belanja, usir kembali
-if (empty($_SESSION['keranjang'])) {
+// Validasi Keamanan: Pastikan pelanggan berasal dari alur pembayaran yang benar
+if (!isset($_SESSION['id_pesanan_aktif'])) {
     header("Location: pembeli_kue.php");
     exit;
 }
 
 $metode = isset($_GET['metode']) ? $_GET['metode'] : 'Tunai';
+$kode_pesanan = $_SESSION['kode_pesanan_aktif'];
+$total_harga = $_SESSION['total_bayar'];
 
-$kode_pesanan = '#' . rand(100, 999);
-$nama_pelanggan = "Pelanggan " . rand(10, 99);
-$waktu_pesan = date('Y-m-d H:i:s');
-$status_pesanan = 'Selesai';
-$total_harga = $_SESSION['total_bayar']; // Mengambil total dari sesi
-
-// 1. Simpan Transaksi Utama
-$query_pesanan = "INSERT INTO pesanan (kode_pesanan, nama_pelanggan, total_harga, metode_pembayaran, status_pesanan, waktu_pesan) 
-                  VALUES ('$kode_pesanan', '$nama_pelanggan', '$total_harga', '$metode', '$status_pesanan', '$waktu_pesan')";
-mysqli_query($conn, $query_pesanan);
-$id_pesanan_baru = mysqli_insert_id($conn);
-
-// 2. Simpan Detail Item (Looping isi keranjang satu per satu ke database)
-foreach ($_SESSION['keranjang'] as $id_menu => $qty) {
-    $query_menu = mysqli_query($conn, "SELECT harga FROM menu WHERE id='$id_menu'");
-    $menu = mysqli_fetch_assoc($query_menu);
-
-    $subtotal_item = $menu['harga'] * $qty;
-    $query_detail = "INSERT INTO detail_pesanan (id_pesanan, id_menu, qty, subtotal) 
-                     VALUES ('$id_pesanan_baru', '$id_menu', '$qty', '$subtotal_item')";
-    mysqli_query($conn, $query_detail);
-}
-
-// 3. Setelah sukses masuk database, bersihkan memori keranjang!
+// Bersihkan memori keranjang karena pesanan sudah tuntas masuk ke database
 unset($_SESSION['keranjang']);
 unset($_SESSION['subtotal']);
 unset($_SESSION['pajak']);
 unset($_SESSION['total_bayar']);
 unset($_SESSION['total_item']);
+unset($_SESSION['id_pesanan_aktif']);
+unset($_SESSION['kode_pesanan_aktif']);
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -74,8 +54,7 @@ unset($_SESSION['total_item']);
                     <?= $kode_pesanan ?>
                 </span>
             </div>
-            <div class="flex justify-between items-center mb-3 pb-3 bo
-                   rder-b border-gray-200">
+            <div class="flex justify-between items-center mb-3 pb-3 border-b border-gray-200">
                 <span class="text-xs text-gray-500">Metode</span><span class="font-semibold">
                     <?= $metode ?>
                 </span>

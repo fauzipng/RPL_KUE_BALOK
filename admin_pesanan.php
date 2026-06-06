@@ -1,7 +1,17 @@
 <?php
 require 'koneksi.php';
 
-// Query diubah menjadi ORDER BY p.waktu_pesan DESC agar yang terbaru di atas
+// Logika untuk Mengonfirmasi Pesanan
+if (isset($_GET['konfirmasi'])) {
+    $id_pesanan = $_GET['konfirmasi'];
+    mysqli_query($conn, "UPDATE pesanan SET status_pesanan = 'Selesai' WHERE id = '$id_pesanan'");
+
+    // Refresh halaman agar status langsung berubah dan parameter URL bersih
+    header("Location: admin_pesanan.php");
+    exit;
+}
+
+// Query mengambil data pesanan beserta daftar itemnya (yang terbaru di atas)
 $query = "SELECT p.*, 
             (SELECT GROUP_CONCAT(CONCAT(m.nama_menu, ' x', dp.qty) SEPARATOR ', ') 
              FROM detail_pesanan dp 
@@ -75,7 +85,7 @@ $result = mysqli_query($conn, $query);
     <main class="flex-1 overflow-y-auto p-10">
         <header class="mb-8">
             <h2 class="text-3xl font-bold text-[#5e3a21]">Pesanan</h2>
-            <p class="text-gray-500 text-sm mt-1">Data langsung dari Database</p>
+            <p class="text-gray-500 text-sm mt-1">Data langsung dari Database (Real-time)</p>
         </header>
 
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
@@ -90,9 +100,11 @@ $result = mysqli_query($conn, $query);
                             <th class="pb-4 font-medium">Total</th>
                             <th class="pb-4 font-medium">Pembayaran</th>
                             <th class="pb-4 font-medium">Waktu</th>
+                            <th class="pb-4 font-medium">Status</th>
+                            <th class="pb-4 font-medium">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-50">
+                    <tbody id="tabel-pesanan" class="divide-y divide-gray-50">
                         <?php while ($row = mysqli_fetch_assoc($result)):
                             $waktuFormat = date('d M Y, H:i', strtotime($row['waktu_pesan']));
                             ?>
@@ -120,6 +132,25 @@ $result = mysqli_query($conn, $query);
                                 <td class="py-4 text-gray-500 text-xs">
                                     <?= $waktuFormat ?>
                                 </td>
+                                <td class="py-4">
+                                    <?php if ($row['status_pesanan'] == 'Pending'): ?>
+                                        <span
+                                            class="bg-yellow-100 text-yellow-700 border border-yellow-200 px-3 py-1 rounded-full text-[11px] font-medium">Pending</span>
+                                    <?php else: ?>
+                                        <span
+                                            class="bg-green-100 text-green-700 border border-green-200 px-3 py-1 rounded-full text-[11px] font-medium">Selesai</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="py-4">
+                                    <?php if ($row['status_pesanan'] == 'Pending'): ?>
+                                        <a href="admin_pesanan.php?konfirmasi=<?= $row['id'] ?>"
+                                            class="bg-[#5e3a21] text-white px-3 py-1.5 rounded-lg text-[11px] font-medium hover:bg-[#4a2e1a] transition shadow-sm">
+                                            Konfirmasi
+                                        </a>
+                                    <?php else: ?>
+                                        <span class="text-gray-400 text-xs">-</span>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endwhile; ?>
                     </tbody>
@@ -127,6 +158,26 @@ $result = mysqli_query($conn, $query);
             </div>
         </div>
     </main>
+
+    <script>
+        // Jalankan fungsi ini setiap 3 detik (3000 milidetik)
+        setInterval(function () {
+            fetch('admin_pesanan.php')
+                .then(response => response.text())
+                .then(html => {
+                    // Ubah teks HTML yang diambil menjadi dokumen DOM
+                    let parser = new DOMParser();
+                    let doc = parser.parseFromString(html, 'text/html');
+
+                    // Ekstrak HANYA bagian tabel (tbody) yang baru
+                    let tbodyBaru = doc.getElementById('tabel-pesanan').innerHTML;
+
+                    // Timpa isi tabel lama dengan yang baru tanpa membuat layar berkedip
+                    document.getElementById('tabel-pesanan').innerHTML = tbodyBaru;
+                })
+                .catch(error => console.error('Gagal mengambil data pesanan baru:', error));
+        }, 3000);
+    </script>
 </body>
 
 </html>
